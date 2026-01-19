@@ -51,7 +51,7 @@ while true; do
         HOST="${SERVERS[$i]}"
         IP="${IPS[$i]}"
 
-        if nc -z -w1 "$IP" "$PORT"; then
+        if nc -G 1 -w 1 -v "$IP" "$PORT"; then
             echo "$TIMESTAMP [$HOST] OK: $HOST ($IP):$PORT erreichbar" >> "$LOGFILE"
         else
             echo "$TIMESTAMP [$HOST] FAIL: $HOST ($IP):$PORT NICHT erreichbar" >> "$LOGFILE"
