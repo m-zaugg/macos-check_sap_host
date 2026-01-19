@@ -9,7 +9,7 @@ SERVERS=(
 
 IPS=()   # gleiche Reihenfolge wie SERVERS
 
-LOGFILE="$HOME/netcat_fqdn_check.log"
+LOGFILE="$HOME/sap-host-check.log"
 
 echo "Starte Initial-DNS-Checks..."
 
