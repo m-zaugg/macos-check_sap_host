@@ -1,28 +1,25 @@
 #!/bin/bash
 
-# Nur FQDNs angeben – Port ist global definiert
 PORT=3200
 
 SERVERS=(
-    "web01.example.org"
-    "db.example.org"
-    "backup01.example.org"
+    "a62prodapha00.infra.be.ch"
+    "a62prodapha01.infra.be.ch"
 )
+
+IPS=()   # gleiche Reihenfolge wie SERVERS
 
 LOGFILE="$HOME/netcat_fqdn_check.log"
 
 echo "Starte Initial-DNS-Checks..."
 
-declare -A RESOLVED_IPS
-
 resolve_ip() {
     local host="$1"
-
-    # DNS-Auflösung via dig
     local ip
+
     ip=$(dig +short "$host" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
 
-    if [[ -z "$ip" ]]; then
+    if [ -z "$ip" ]; then
         echo "UNRESOLVED"
     else
         echo "$ip"
@@ -33,13 +30,13 @@ resolve_ip() {
 for HOST in "${SERVERS[@]}"; do
     IP=$(resolve_ip "$HOST")
 
-    if [[ "$IP" == "UNRESOLVED" ]]; then
+    if [ "$IP" = "UNRESOLVED" ]; then
         echo "FEHLER: Host '$HOST' konnte nicht aufgelöst werden. Abbruch."
         exit 1
     fi
 
-    RESOLVED_IPS["$HOST"]="$IP"
-    echo "OK: $HOST → ${RESOLVED_IPS[$HOST]}"
+    IPS+=("$IP")
+    echo "OK: $HOST → $IP"
 done
 
 echo "Alle Hosts erfolgreich aufgelöst. Monitoring startet..."
@@ -50,8 +47,9 @@ echo
 while true; do
     TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
-    for HOST in "${SERVERS[@]}"; do
-        IP="${RESOLVED_IPS[$HOST]}"
+    for i in "${!SERVERS[@]}"; do
+        HOST="${SERVERS[$i]}"
+        IP="${IPS[$i]}"
 
         if nc -z -w1 "$IP" "$PORT"; then
             echo "$TIMESTAMP [$HOST] OK: $HOST ($IP):$PORT erreichbar" >> "$LOGFILE"
