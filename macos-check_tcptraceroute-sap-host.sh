@@ -1,36 +1,54 @@
 #!/bin/bash
 
-# Port für tcptraceroute
 PORT=3200
 
-# Intervall zwischen den Durchläufen (in Sekunden)
-INTERVAL=1
-
-# Ziele als Bash-3.2-kompatibles Array
 TARGETS=(
-    "1.2.3.4"
-    "example.com"
-    "10.20.30.40"
+    "a62prodapha00.infra.be.ch"
+    "a62prodapha01.infra.be.ch"
 )
 
-LOGFILE="tcptrace.log"
+LOGFILE="$HOME/sap-host-tcptraceroute.log"
 
-echo "Starte TCP-Traceroute Monitoring auf Port $PORT ..."
+echo "Starte host-unabhängiges TCP-Traceroute Monitoring mit Änderungsdetektion ..."
 echo "Ziele: ${TARGETS[*]}"
 echo "Logfile: $LOGFILE"
 echo "---------------------------------------------"
 
-while true; do
-    TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+# Für jeden Host einen eigenen Prozess starten
+for TARGET in "${TARGETS[@]}"; do
+(
+    LAST_ROUTE=""
 
-    # Array seriell durchlaufen
-    for TARGET in "${TARGETS[@]}"; do
-        echo "[$TIMESTAMP] Prüfe $TARGET ..." | tee -a "$LOGFILE"
+    while true; do
+        TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
-        tcptraceroute "$TARGET" "$PORT" 2>&1 | tee -a "$LOGFILE"
+        # Route erfassen (nur Hop-Liste extrahieren)
+        CURRENT_ROUTE=$(tcptraceroute "$TARGET" "$PORT" 2>&1)
 
-        echo "---------------------------------------------" | tee -a "$LOGFILE"
+        # Nur die Hop-Zeilen extrahieren (Start mit Zahl)
+        CLEAN_ROUTE=$(echo "$CURRENT_ROUTE" | grep -E "^[ ]*[0-9]+[ ]")
+
+        # Wenn erste Messung → speichern und loggen
+        if [ -z "$LAST_ROUTE" ]; then
+            LAST_ROUTE="$CLEAN_ROUTE"
+            echo "[$TIMESTAMP] Initiale Route für $TARGET gespeichert." | tee -a "$LOGFILE"
+            echo "$CLEAN_ROUTE" | tee -a "$LOGFILE"
+            echo "---------------------------------------------" | tee -a "$LOGFILE"
+        else
+            # Vergleich
+            if [ "$CLEAN_ROUTE" != "$LAST_ROUTE" ]; then
+                echo "[$TIMESTAMP] *** ROUTE ÄNDERUNG für $TARGET ***" | tee -a "$LOGFILE"
+                echo "--- Alte Route ---" | tee -a "$LOGFILE"
+                echo "$LAST_ROUTE" | tee -a "$LOGFILE"
+                echo "--- Neue Route ---" | tee -a "$LOGFILE"
+                echo "$CLEAN_ROUTE" | tee -a "$LOGFILE"
+                echo "---------------------------------------------" | tee -a "$LOGFILE"
+
+                LAST_ROUTE="$CLEAN_ROUTE"
+            fi
+        fi
     done
-
-    sleep "$INTERVAL"
+) &
 done
+
+wait
